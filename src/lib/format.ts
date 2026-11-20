@@ -33,6 +33,21 @@ export function formatDateTime(iso: string) {
   );
 }
 
+/** "18:54" */
+export function formatTime(iso: string) {
+  return new Intl.DateTimeFormat("th-TH", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
+/** Percent change from previous to current, e.g. 12.3 or -4 (null when there is no baseline). */
+export function percentChange(current: number, previous: number): number | null {
+  if (!previous) return null;
+  return ((current - previous) / previous) * 100;
+}
+
 /** "20 พ.ย. 18:54" (short, for table rows) */
 export function formatShortDateTime(iso: string) {
   return new Intl.DateTimeFormat("th-TH", {
