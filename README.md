@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SME Business Intelligence Dashboard
 
-## Getting Started
+Dashboard หน้าเดียวสำหรับเจ้าของร้าน SME แสดงภาพรวมธุรกิจจากฐานข้อมูล Supabase
 
-First, run the development server:
+- ยอดขายรวม, จำนวนคำสั่งซื้อ, จำนวนลูกค้า, ยอดเฉลี่ยต่อบิล
+- กราฟแนวโน้มยอดขาย (7 วัน / 30 วัน / 12 เดือน / ทั้งหมด) ดูเป็นกราฟหรือตารางได้
+- สินค้าขายดี 5 อันดับ
+- คำสั่งซื้อล่าสุด 10 รายการ
+- รองรับ Desktop / Mobile และ Dark mode
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+**Stack:** Next.js 16 (App Router, Cache Components) · Tailwind CSS 4 · Recharts · Supabase (PostgreSQL) · Vercel
+
+## โครงสร้างโปรเจกต์
+
+```
+supabase/              SQL: ตาราง + ข้อมูลตัวอย่าง, views, query ตรวจสอบ (ดู supabase/README.md)
+src/lib/supabase.ts    สร้าง Supabase client (ฝั่งเซิร์ฟเวอร์เท่านั้น)
+src/lib/dashboard.ts   getDashboardData(): ดึงข้อมูลทั้งหมดจาก 5 views แบบขนาน + cache 1 นาที
+src/lib/format.ts      จัดรูปแบบเงินบาท / วันที่ภาษาไทย
+src/app/page.tsx       หน้า Dashboard (Server Component)
+src/components/        KpiCards, SalesChart (client), TopProducts, RecentOrders, StatusBadge
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## การทำงานของระบบ
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. ผู้ใช้เปิด URL → Vercel ส่งหน้า HTML ที่ render ไว้แล้ว (เร็ว)
+2. `getDashboardData()` ใช้ `'use cache'` + `cacheLife('minutes')` → ข้อมูลถูก cache และรีเฟรชเบื้องหลังทุก ~1 นาที
+3. ตอนรีเฟรช เซิร์ฟเวอร์ query 5 views ใน Supabase พร้อมกัน ด้วย anon key (อ่านได้เฉพาะ views)
+4. การคำนวณ (รวมยอด, จัดอันดับ, group by วัน/เดือน) ทำใน PostgreSQL views ไม่ได้ทำในเว็บ
+5. กราฟเป็น Client Component เพราะต้องโต้ตอบ (สลับช่วงเวลา, hover)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## เริ่มใช้งานในเครื่อง
 
-## Learn More
+1. ตั้งค่าฐานข้อมูลตาม `supabase/README.md`
+2. คัดลอก `.env.example` เป็น `.env.local` แล้วใส่ค่า `SUPABASE_URL` และ `SUPABASE_ANON_KEY`
+3. รัน
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+เปิด http://localhost:3000
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy บน Vercel
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Push ขึ้น GitHub
+2. Vercel → Add New Project → Import repo นี้
+3. Environment Variables: ใส่ `SUPABASE_URL` และ `SUPABASE_ANON_KEY`
+4. Deploy
