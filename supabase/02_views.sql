@@ -23,13 +23,14 @@ drop view if exists v_sales_daily;
 drop view if exists v_sales_monthly;
 drop view if exists v_top_products;
 drop view if exists v_recent_orders;
+drop view if exists v_sales_heatmap;
 
 -- ---------------------------------------------------------------------
 -- 1-3) KPI cards: Total Revenue / Total Orders / Total Customers (1 row)
 -- ---------------------------------------------------------------------
 create view v_dashboard_summary as
 with valid_orders as (
-  select id, status
+  select id, status, customer_id, ordered_at
   from orders
   where ordered_at <= now()
 ),
@@ -46,6 +47,9 @@ select
   (select count(*) from valid_orders where status = 'pending')   as pending_orders,
   (select count(*) from valid_orders where status = 'cancelled') as cancelled_orders,
   (select count(*) from customers)                             as total_customers,
+  -- customers who placed at least one order in the last 30 days
+  (select count(distinct customer_id) from valid_orders
+    where ordered_at > now() - interval '30 days')             as active_customers_30d,
   round(
     r.total_revenue / nullif((select count(*) from valid_orders where status = 'paid'), 0),
     2
@@ -129,6 +133,26 @@ cross join lateral (
 where o.ordered_at <= now();
 
 -- ---------------------------------------------------------------------
+-- Extra) Peak hours: paid orders by weekday x hour (Thai time)
+--        weekday: 1 = Monday ... 7 = Sunday (ISO)
+-- ---------------------------------------------------------------------
+create view v_sales_heatmap as
+select
+  extract(isodow from o.ordered_at at time zone 'Asia/Bangkok')::int as weekday,
+  extract(hour   from o.ordered_at at time zone 'Asia/Bangkok')::int as hour,
+  count(*)                                                          as orders,
+  sum(t.amount)::numeric(14,2)                                      as revenue
+from orders o
+cross join lateral (
+  select sum(oi.quantity * oi.unit_price) as amount
+  from order_items oi
+  where oi.order_id = o.id
+) t
+where o.status = 'paid'
+  and o.ordered_at <= now()
+group by 1, 2;
+
+-- ---------------------------------------------------------------------
 -- Access control
 -- ---------------------------------------------------------------------
 alter table customers   enable row level security;
@@ -146,5 +170,6 @@ grant select on
   v_sales_daily,
   v_sales_monthly,
   v_top_products,
-  v_recent_orders
+  v_recent_orders,
+  v_sales_heatmap
 to anon, authenticated;
